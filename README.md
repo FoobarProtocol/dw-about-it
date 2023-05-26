@@ -1,417 +1,75 @@
-# T5
+---
+license: bsd-3-clause
+---
 
-<div class="flex flex-wrap space-x-1">
-<a href="https://huggingface.co/models?filter=t5">
-<img alt="Models" src="https://img.shields.io/badge/All_model_pages-t5-blueviolet">
-</a>
-<a href="https://huggingface.co/spaces/docs-demos/t5-base">
-<img alt="Spaces" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue">
-</a>
-<a href="https://huggingface.co/papers/1910.10683">
-<img alt="Paper page" src="https://img.shields.io/badge/Paper%20page-1910.10683-green">
-</a>
-</div>
+# InstructCodeT5+ 16B
 
-## Overview
+## Model description
 
-The T5 model was presented in [Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer](https://arxiv.org/pdf/1910.10683.pdf) by [Colin Raffel](https://huggingface.co/craffel), Noam Shazeer, [Adam Roberts](https://huggingface.co/adarob), Katherine Lee, Sharan Narang,
-Michael Matena, Yanqi Zhou, Wei Li, [Peter J. Liu](https://huggingface.co/peterjliu).
+[CodeT5+](https://github.com/salesforce/CodeT5/tree/main/CodeT5+) is a new family of open code large language models with an encoder-decoder architecture that can flexibly operate in different modes (i.e. _encoder-only_, _decoder-only_, and _encoder-decoder_) to support a wide range of code understanding and generation tasks. 
+It is introduced in the paper:
 
-The abstract from the paper is the following:
+[CodeT5+: Open Code Large Language Models for Code Understanding and Generation](https://arxiv.org/pdf/2305.07922.pdf)
+by [Yue Wang](https://yuewang-cuhk.github.io/)\*, [Hung Le](https://sites.google.com/view/henryle2018/home?pli=1)\*, [Akhilesh Deepak Gotmare](https://akhileshgotmare.github.io/), [Nghi D.Q. Bui](https://bdqnghi.github.io/), [Junnan Li](https://sites.google.com/site/junnanlics), [Steven C.H. Hoi](https://sites.google.com/view/stevenhoi/home) (* indicates equal contribution).
 
-*Transfer learning, where a model is first pre-trained on a data-rich task before being fine-tuned on a downstream
-task, has emerged as a powerful technique in natural language processing (NLP). The effectiveness of transfer learning
-has given rise to a diversity of approaches, methodology, and practice. In this paper, we explore the landscape of
-transfer learning techniques for NLP by introducing a unified framework that converts every language problem into a
-text-to-text format. Our systematic study compares pretraining objectives, architectures, unlabeled datasets, transfer
-approaches, and other factors on dozens of language understanding tasks. By combining the insights from our exploration
-with scale and our new "Colossal Clean Crawled Corpus", we achieve state-of-the-art results on many benchmarks covering
-summarization, question answering, text classification, and more. To facilitate future work on transfer learning for
-NLP, we release our dataset, pre-trained models, and code.*
+Compared to the original CodeT5 family (base: `220M`, large: `770M`), CodeT5+ is pretrained with a diverse set of pretraining tasks including _span denoising_, _causal language modeling_, _contrastive learning_, and _text-code matching_ to learn rich representations from both unimodal code data and bimodal code-text data. 
+Additionally, it employs a simple yet effective _compute-efficient pretraining_ method to initialize the model components with frozen off-the-shelf LLMs such as [CodeGen](https://github.com/salesforce/CodeGen) to efficiently scale up the model (i.e. `2B`, `6B`, `16B`), and adopts a "shallow encoder and deep decoder" architecture. 
+Furthermore, it is instruction-tuned to align with natural language instructions (see our InstructCodeT5+ 16B) following [Code Alpaca](https://github.com/sahil280114/codealpaca).  
 
-Tips:
+## How to use
 
-- T5 is an encoder-decoder model pre-trained on a multi-task mixture of unsupervised and supervised tasks and for which
-each task is converted into a text-to-text format. T5 works well on a variety of tasks out-of-the-box by prepending a
-different prefix to the input corresponding to each task, e.g., for translation: *translate English to German: ...*,
-for summarization: *summarize: ...*.
-- The pretraining includes both supervised and self-supervised training. Supervised training is conducted on downstream tasks provided by the GLUE and SuperGLUE benchmarks (converting them into text-to-text tasks as explained above).
-- Self-supervised training uses corrupted tokens, by randomly removing 15% of the tokens and replacing them with individual sentinel tokens (if several consecutive tokens are marked for removal, the whole group is replaced with a single sentinel token). The input of the encoder is the corrupted sentence, the input of the decoder is the original sentence and the target is then the dropped out tokens delimited by their sentinel tokens.
-
-- T5 uses relative scalar embeddings. Encoder input padding can be done on the left and on the right.
-
-- See the [training](#training), [inference](#inference) and [scripts](#scripts) sections below for all details regarding usage.
-
-T5 comes in different sizes:
-
-- [t5-small](https://huggingface.co/t5-small)
-
-- [t5-base](https://huggingface.co/t5-base)
-
-- [t5-large](https://huggingface.co/t5-large)
-
-- [t5-3b](https://huggingface.co/t5-3b)
-
-- [t5-11b](https://huggingface.co/t5-11b).
-
-Based on the original T5 model, Google has released some follow-up works:
-
-- **T5v1.1**: T5v1.1 is an improved version of T5 with some architectural tweaks, and is pre-trained on C4 only without
-  mixing in the supervised tasks. Refer to the documentation of T5v1.1 which can be found [here](t5v1.1).
-
-- **mT5**: mT5 is a multilingual T5 model. It is pre-trained on the mC4 corpus, which includes 101 languages. Refer to
-  the documentation of mT5 which can be found [here](mt5).
-
-- **byT5**: byT5 is a T5 model pre-trained on byte sequences rather than SentencePiece subword token sequences. Refer
-  to the documentation of byT5 which can be found [here](byt5).
-
-- **UL2**: UL2 is a T5 like model pretrained on various denoising objectives
-
-- **Flan-T5**: Flan is a pretraining methods that is based on prompting. The Flan-T5 are T5 models trained on the Flan collection of 
-    datasets which include: `taskmaster2`, `djaym7/wiki_dialog`, `deepmind/code_contests`, `lambada`, `gsm8k`, `aqua_rat`, `esnli`, `quasc` and `qed`.
-
-- **FLan-UL2** : the UL2 model finetuned using the "Flan" prompt tuning and dataset collection.
-
-
-All checkpoints can be found on the [hub](https://huggingface.co/models?search=t5).
-
-This model was contributed by [thomwolf](https://huggingface.co/thomwolf). The original code can be found [here](https://github.com/google-research/text-to-text-transfer-transformer).
-
-<a id='training'></a>
-
-## Training
-
-T5 is an encoder-decoder model and converts all NLP problems into a text-to-text format. It is trained using teacher
-forcing. This means that for training, we always need an input sequence and a corresponding target sequence. The input
-sequence is fed to the model using `input_ids`. The target sequence is shifted to the right, i.e., prepended by a
-start-sequence token and fed to the decoder using the `decoder_input_ids`. In teacher-forcing style, the target
-sequence is then appended by the EOS token and corresponds to the `labels`. The PAD token is hereby used as the
-start-sequence token. T5 can be trained / fine-tuned both in a supervised and unsupervised fashion.
-
-One can use [`T5ForConditionalGeneration`] (or the Tensorflow/Flax variant), which includes the
-language modeling head on top of the decoder.
-
-- Unsupervised denoising training
-
-In this setup, spans of the input sequence are masked by so-called sentinel tokens (*a.k.a* unique mask tokens) and
-the output sequence is formed as a concatenation of the same sentinel tokens and the *real* masked tokens. Each
-sentinel token represents a unique mask token for this sentence and should start with `<extra_id_0>`,
-`<extra_id_1>`, ... up to `<extra_id_99>`. As a default, 100 sentinel tokens are available in
-[`T5Tokenizer`].
-
-For instance, the sentence "The cute dog walks in the park" with the masks put on "cute dog" and "the" should be
-processed as follows:
+This model can be easily loaded using the `AutoModelForSeq2SeqLM` functionality and employs the same tokenizer as [CodeGen](https://github.com/salesforce/CodeGen).
 
 ```python
->>> from transformers import T5Tokenizer, T5ForConditionalGeneration
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
->>> tokenizer = T5Tokenizer.from_pretrained("t5-small")
->>> model = T5ForConditionalGeneration.from_pretrained("t5-small")
+checkpoint = "Salesforce/instructcodet5p-16b"
+device = "cuda" # for GPU usage or "cpu" for CPU usage
 
->>> input_ids = tokenizer("The <extra_id_0> walks in <extra_id_1> park", return_tensors="pt").input_ids
->>> labels = tokenizer("<extra_id_0> cute dog <extra_id_1> the <extra_id_2>", return_tensors="pt").input_ids
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint,
+                                              torch_dtype=torch.float16,
+                                              low_cpu_mem_usage=True,
+                                              trust_remote_code=True).to(device)
 
->>> # the forward function automatically creates the correct decoder_input_ids
->>> loss = model(input_ids=input_ids, labels=labels).loss
->>> loss.item()
-3.7837
+encoding = tokenizer("def print_hello_world():", return_tensors="pt").to(device)
+encoding['decoder_input_ids'] = encoding['input_ids'].clone()
+outputs = model.generate(**encoding, max_length=15)
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))
 ```
 
-If you're interested in pre-training T5 on a new corpus, check out the [run_t5_mlm_flax.py](https://github.com/huggingface/transformers/tree/main/examples/flax/language-modeling) script in the Examples
-directory.
+## Pretraining data
 
-- Supervised training
+This checkpoint is trained on the stricter permissive subset of the deduplicated version of the [github-code dataset](https://huggingface.co/datasets/codeparrot/github-code).
+The data is preprocessed by reserving only permissively licensed code ("mit" “apache-2”, “bsd-3-clause”, “bsd-2-clause”, “cc0-1.0”, “unlicense”, “isc”).
+Supported languages (9 in total) are as follows:
+`c`, `c++`, `c-sharp`,  `go`, `java`, `javascript`,  `php`, `python`, `ruby.`
 
-In this setup, the input sequence and output sequence are a standard sequence-to-sequence input-output mapping.
-Suppose that we want to fine-tune the model for translation for example, and we have a training example: the input
-sequence "The house is wonderful." and output sequence "Das Haus ist wunderbar.", then they should be prepared for
-the model as follows:
+## Training procedure
 
-```python
->>> from transformers import T5Tokenizer, T5ForConditionalGeneration
+This checkpoint is initialized from off-the-shelf LLMs, i.e. its encoder is initialized from [CodeGen-350M-mono](https://huggingface.co/Salesforce/codegen-350M-mono) and its decoder is initialized from [CodeGen-16B-mono](https://huggingface.co/Salesforce/codegen-16B-mono).
+It is trained on the unimodal code data at the first-stage pretraining, which includes a diverse set of pretraining tasks including _span denoising_ and two variants of _causal language modeling_.
+After that, it is further trained on the Python subset with the causal language modeling objective for another epoch to better adapt for Python code generation. 
+Finally, we apply instruction tuning to align it with natural language instructions following [Code Alpaca](https://github.com/sahil280114/codealpaca).  
+Please refer to the paper for more details.
 
->>> tokenizer = T5Tokenizer.from_pretrained("t5-small")
->>> model = T5ForConditionalGeneration.from_pretrained("t5-small")
+## Evaluation results
 
->>> input_ids = tokenizer("translate English to German: The house is wonderful.", return_tensors="pt").input_ids
->>> labels = tokenizer("Das Haus ist wunderbar.", return_tensors="pt").input_ids
+CodeT5+ models have been comprehensively evaluated on a wide range of code understanding and generation tasks in various settings: _zero-shot_, _finetuning_, and _instruction-tuning_.
+Specifically, CodeT5+ yields substantial performance gains on many downstream tasks compared to their SoTA baselines, e.g.,
+8 text-to-code retrieval tasks (+3.2 avg. MRR), 2 line-level code completion tasks (+2.1 avg. Exact Match), and 2 retrieval-augmented code generation tasks (+5.8 avg. BLEU-4). 
+In 2 math programming tasks on MathQA-Python and GSM8K-Python, CodeT5+ models of below billion-parameter sizes significantly outperform many LLMs of up to 137B parameters. 
+Particularly, in the zero-shot text-to-code generation task on HumanEval benchmark, InstructCodeT5+ 16B sets new SoTA results of 35.0% pass@1 and 54.5% pass@10 against other open code LLMs, even surpassing the closed-source OpenAI code-cushman-001 mode
+Please refer to the [paper](https://arxiv.org/pdf/2305.07922.pdf) for more details.
 
->>> # the forward function automatically creates the correct decoder_input_ids
->>> loss = model(input_ids=input_ids, labels=labels).loss
->>> loss.item()
-0.2542
+
+## BibTeX entry and citation info
+
+```bibtex
+@article{wang2023codet5plus,
+  title={CodeT5+: Open Code Large Language Models for Code Understanding and Generation},
+  author={Wang, Yue and Le, Hung and Gotmare, Akhilesh Deepak and Bui, Nghi D.Q. and Li, Junnan and Hoi, Steven C. H.},
+  journal={arXiv preprint},
+  year={2023}
+}
 ```
-
-As you can see, only 2 inputs are required for the model in order to compute a loss: `input_ids` (which are the
-`input_ids` of the encoded input sequence) and `labels` (which are the `input_ids` of the encoded
-target sequence). The model will automatically create the `decoder_input_ids` based on the `labels`, by
-shifting them one position to the right and prepending the `config.decoder_start_token_id`, which for T5 is
-equal to 0 (i.e. the id of the pad token). Also note the task prefix: we prepend the input sequence with 'translate
-English to German: ' before encoding it. This will help in improving the performance, as this task prefix was used
-during T5's pre-training.
-
-However, the example above only shows a single training example. In practice, one trains deep learning models in
-batches. This entails that we must pad/truncate examples to the same length. For encoder-decoder models, one
-typically defines a `max_source_length` and `max_target_length`, which determine the maximum length of the
-input and output sequences respectively (otherwise they are truncated). These should be carefully set depending on
-the task.
-
-In addition, we must make sure that padding token id's of the `labels` are not taken into account by the loss
-function. In PyTorch and Tensorflow, this can be done by replacing them with -100, which is the `ignore_index`
-of the `CrossEntropyLoss`. In Flax, one can use the `decoder_attention_mask` to ignore padded tokens from
-the loss (see the [Flax summarization script](https://github.com/huggingface/transformers/tree/main/examples/flax/summarization) for details). We also pass
-`attention_mask` as additional input to the model, which makes sure that padding tokens of the inputs are
-ignored. The code example below illustrates all of this.
-
-```python
->>> from transformers import T5Tokenizer, T5ForConditionalGeneration
->>> import torch
-
->>> tokenizer = T5Tokenizer.from_pretrained("t5-small")
->>> model = T5ForConditionalGeneration.from_pretrained("t5-small")
-
->>> # the following 2 hyperparameters are task-specific
->>> max_source_length = 512
->>> max_target_length = 128
-
->>> # Suppose we have the following 2 training examples:
->>> input_sequence_1 = "Welcome to NYC"
->>> output_sequence_1 = "Bienvenue à NYC"
-
->>> input_sequence_2 = "HuggingFace is a company"
->>> output_sequence_2 = "HuggingFace est une entreprise"
-
->>> # encode the inputs
->>> task_prefix = "translate English to French: "
->>> input_sequences = [input_sequence_1, input_sequence_2]
-
->>> encoding = tokenizer(
-...     [task_prefix + sequence for sequence in input_sequences],
-...     padding="longest",
-...     max_length=max_source_length,
-...     truncation=True,
-...     return_tensors="pt",
-... )
-
->>> input_ids, attention_mask = encoding.input_ids, encoding.attention_mask
-
->>> # encode the targets
->>> target_encoding = tokenizer(
-...     [output_sequence_1, output_sequence_2],
-...     padding="longest",
-...     max_length=max_target_length,
-...     truncation=True,
-...     return_tensors="pt",
-... )
->>> labels = target_encoding.input_ids
-
->>> # replace padding token id's of the labels by -100 so it's ignored by the loss
->>> labels[labels == tokenizer.pad_token_id] = -100
-
->>> # forward pass
->>> loss = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels).loss
->>> loss.item()
-0.188
-```
-
-Additional training tips:
-
-- T5 models need a slightly higher learning rate than the default one set in the `Trainer` when using the AdamW
-optimizer. Typically, 1e-4 and 3e-4 work well for most problems (classification, summarization, translation, question
-answering, question generation). Note that T5 was pre-trained using the AdaFactor optimizer.
-
-According to [this forum post](https://discuss.huggingface.co/t/t5-finetuning-tips/684), task prefixes matter when
-(1) doing multi-task training (2) your task is similar or related to one of the supervised tasks used in T5's
-pre-training mixture (see Appendix D of the [paper](https://arxiv.org/pdf/1910.10683.pdf) for the task prefixes
-used).
-
-If training on TPU, it is recommended to pad all examples of the dataset to the same length or make use of
-*pad_to_multiple_of* to have a small number of predefined bucket sizes to fit all examples in. Dynamically padding
-batches to the longest example is not recommended on TPU as it triggers a recompilation for every batch shape that is
-encountered during training thus significantly slowing down the training. only padding up to the longest example in a
-batch) leads to very slow training on TPU.
-
-<a id='inference'></a>
-
-## Inference
-
-At inference time, it is recommended to use [`~generation.GenerationMixin.generate`]. This
-method takes care of encoding the input and feeding the encoded hidden states via cross-attention layers to the decoder
-and auto-regressively generates the decoder output. Check out [this blog post](https://huggingface.co/blog/how-to-generate) to know all the details about generating text with Transformers.
-There's also [this blog post](https://huggingface.co/blog/encoder-decoder#encoder-decoder) which explains how
-generation works in general in encoder-decoder models.
-
-```python
->>> from transformers import T5Tokenizer, T5ForConditionalGeneration
-
->>> tokenizer = T5Tokenizer.from_pretrained("t5-small")
->>> model = T5ForConditionalGeneration.from_pretrained("t5-small")
-
->>> input_ids = tokenizer("translate English to German: The house is wonderful.", return_tensors="pt").input_ids
->>> outputs = model.generate(input_ids)
->>> print(tokenizer.decode(outputs[0], skip_special_tokens=True))
-Das Haus ist wunderbar.
-```
-
-Note that T5 uses the `pad_token_id` as the `decoder_start_token_id`, so when doing generation without using
-[`~generation.GenerationMixin.generate`], make sure you start it with the `pad_token_id`.
-
-The example above only shows a single example. You can also do batched inference, like so:
-
-```python
->>> from transformers import T5Tokenizer, T5ForConditionalGeneration
-
->>> tokenizer = T5Tokenizer.from_pretrained("t5-small")
->>> model = T5ForConditionalGeneration.from_pretrained("t5-small")
-
->>> task_prefix = "translate English to German: "
->>> # use different length sentences to test batching
->>> sentences = ["The house is wonderful.", "I like to work in NYC."]
-
->>> inputs = tokenizer([task_prefix + sentence for sentence in sentences], return_tensors="pt", padding=True)
-
->>> output_sequences = model.generate(
-...     input_ids=inputs["input_ids"],
-...     attention_mask=inputs["attention_mask"],
-...     do_sample=False,  # disable sampling to test if batching affects output
-... )
-
->>> print(tokenizer.batch_decode(output_sequences, skip_special_tokens=True))
-['Das Haus ist wunderbar.', 'Ich arbeite gerne in NYC.']
-```
-
-Because T5 has been trained with the span-mask denoising objective,
-it can be used to predict the sentinel (masked-out) tokens during inference.
-The predicted tokens will then be placed between the sentinel tokens.
-
-```python
->>> from transformers import T5Tokenizer, T5ForConditionalGeneration
-
->>> tokenizer = T5Tokenizer.from_pretrained("t5-small")
->>> model = T5ForConditionalGeneration.from_pretrained("t5-small")
-
->>> input_ids = tokenizer("The <extra_id_0> walks in <extra_id_1> park", return_tensors="pt").input_ids
-
->>> sequence_ids = model.generate(input_ids)
->>> sequences = tokenizer.batch_decode(sequence_ids)
->>> sequences
-['<pad><extra_id_0> park offers<extra_id_1> the<extra_id_2> park.</s>']
-```
-
-
-<a id='scripts'></a>
-
-## Performance
-
-If you'd like a faster training and inference performance, install [apex](https://github.com/NVIDIA/apex#quick-start) and then the model will automatically use `apex.normalization.FusedRMSNorm` instead of `T5LayerNorm`. The former uses an optimized fused kernel which is several times faster than the latter.
-
-
-## Resources
-
-A list of official Hugging Face and community (indicated by 🌎) resources to help you get started with T5. If you're interested in submitting a resource to be included here, please feel free to open a Pull Request and we'll review it! The resource should ideally demonstrate something new instead of duplicating an existing resource.
-
-<PipelineTag pipeline="text-classification"/>
-
-- A notebook for how to [finetune T5 for classification and multiple choice](https://colab.research.google.com/github/patil-suraj/exploring-T5/blob/master/t5_fine_tuning.ipynb).
-- A notebook for how to [finetune T5 for sentiment span extraction](https://colab.research.google.com/github/enzoampil/t5-intro/blob/master/t5_qa_training_pytorch_span_extraction.ipynb). 🌎
-
-<PipelineTag pipeline="token-classification"/>
-
-- A notebook for how to [finetune T5 for named entity recognition](https://colab.research.google.com/drive/1obr78FY_cBmWY5ODViCmzdY6O1KB65Vc?usp=sharing). 🌎
-
-<PipelineTag pipeline="text-generation"/>
-
-- A notebook for [Finetuning CodeT5 for generating docstrings from Ruby code](https://colab.research.google.com/github/NielsRogge/Transformers-Tutorials/blob/master/T5/Fine_tune_CodeT5_for_generating_docstrings_from_Ruby_code.ipynb).
-
-<PipelineTag pipeline="summarization"/>
-
-- A notebook to [Finetune T5-base-dutch to perform Dutch abstractive summarization on a TPU](https://colab.research.google.com/github/NielsRogge/Transformers-Tutorials/blob/master/T5/Fine_tuning_Dutch_T5_base_on_CNN_Daily_Mail_for_summarization_(on_TPU_using_HuggingFace_Accelerate).ipynb).
-- A notebook for how to [finetune T5 for summarization in PyTorch and track experiments with WandB](https://colab.research.google.com/github/abhimishra91/transformers-tutorials/blob/master/transformers_summarization_wandb.ipynb#scrollTo=OKRpFvYhBauC). 🌎
-- A blog post on [Distributed Training: Train BART/T5 for Summarization using 🤗 Transformers and Amazon SageMaker](https://huggingface.co/blog/sagemaker-distributed-training-seq2seq).
-- [`T5ForConditionalGeneration`] is supported by this [example script](https://github.com/huggingface/transformers/tree/main/examples/pytorch/summarization) and [notebook](https://colab.research.google.com/github/huggingface/notebooks/blob/main/examples/summarization.ipynb).
-- [`TFT5ForConditionalGeneration`] is supported by this [example script](https://github.com/huggingface/transformers/tree/main/examples/tensorflow/summarization) and [notebook](https://colab.research.google.com/github/huggingface/notebooks/blob/main/examples/summarization-tf.ipynb).
-- [`FlaxT5ForConditionalGeneration`] is supported by this [example script](https://github.com/huggingface/transformers/tree/main/examples/flax/summarization).
-- [Summarization](https://huggingface.co/course/chapter7/5?fw=pt#summarization) chapter of the 🤗 Hugging Face course.
-- [Summarization task guide](../tasks/summarization)
-
-<PipelineTag pipeline="fill-mask"/>
-
-- [`FlaxT5ForConditionalGeneration`] is supported by this [example script](https://github.com/huggingface/transformers/tree/main/examples/flax/language-modeling#t5-like-span-masked-language-modeling) for training T5 with a span-masked language model objective. The script also shows how to train a T5 tokenizer. [`FlaxT5ForConditionalGeneration`] is also supported by this [notebook](https://colab.research.google.com/github/huggingface/notebooks/blob/main/examples/masked_language_modeling_flax.ipynb).
-
-<PipelineTag pipeline="translation"/>
-
-- [`T5ForConditionalGeneration`] is supported by this [example script](https://github.com/huggingface/transformers/tree/main/examples/pytorch/translation) and [notebook](https://colab.research.google.com/github/huggingface/notebooks/blob/main/examples/translation.ipynb).
-- [`TFT5ForConditionalGeneration`] is supported by this [example script](https://github.com/huggingface/transformers/tree/main/examples/tensorflow/translation) and [notebook](https://colab.research.google.com/github/huggingface/notebooks/blob/main/examples/translation-tf.ipynb).
-- [Translation task guide](../tasks/translation)
-
-<PipelineTag pipeline="question-answering"/>
-
-- A notebook on how to [finetune T5 for question answering with TensorFlow 2](https://colab.research.google.com/github/snapthat/TF-T5-text-to-text/blob/master/snapthatT5/notebooks/TF-T5-Datasets%20Training.ipynb). 🌎
-- A notebook on how to [finetune T5 for question answering on a TPU](https://colab.research.google.com/github/patil-suraj/exploring-T5/blob/master/T5_on_TPU.ipynb#scrollTo=QLGiFCDqvuil).
-
-🚀 **Deploy**
-- A blog post on how to deploy [T5 11B for inference for less than $500](https://www.philschmid.de/deploy-t5-11b).
-
-## T5Config
-
-[[autodoc]] T5Config
-
-## T5Tokenizer
-
-[[autodoc]] T5Tokenizer
-    - build_inputs_with_special_tokens
-    - get_special_tokens_mask
-    - create_token_type_ids_from_sequences
-    - save_vocabulary
-
-## T5TokenizerFast
-
-[[autodoc]] T5TokenizerFast
-
-## T5Model
-
-[[autodoc]] T5Model
-    - forward
-
-## T5ForConditionalGeneration
-
-[[autodoc]] T5ForConditionalGeneration
-    - forward
-
-## T5EncoderModel
-
-[[autodoc]] T5EncoderModel
-    - forward
-
-## TFT5Model
-
-[[autodoc]] TFT5Model
-    - call
-
-## TFT5ForConditionalGeneration
-
-[[autodoc]] TFT5ForConditionalGeneration
-    - call
-
-## TFT5EncoderModel
-
-[[autodoc]] TFT5EncoderModel
-    - call
-
-## FlaxT5Model
-
-[[autodoc]] FlaxT5Model
-    - __call__
-    - encode
-    - decode
-
-## FlaxT5ForConditionalGeneration
-
-[[autodoc]] FlaxT5ForConditionalGeneration
-    - __call__
-    - encode
-    - decode
-
-## FlaxT5EncoderModel
-
-[[autodoc]] FlaxT5En
